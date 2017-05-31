@@ -66,7 +66,7 @@ AS
   maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
-  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  select MANV into maNV from KHOA_NHANVIEN;   --Chi tra ve ma cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
   maNV_raw := dbms_crypto.hash(maNV, hash_type); 
   k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select encrypt_chitieu.maChiTieu(soTien, k) into tam from dual;
@@ -83,7 +83,7 @@ AS
   maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
-  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  select MANV into maNV from KHOA_NHANVIEN;   --Chi tra ve ma cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
   maNV_raw := dbms_crypto.hash(maNV, hash_type); 
   k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select encrypt_chitieu.maChiTieu(tien, k) into tam from dual;
@@ -101,7 +101,7 @@ CREATE OR REPLACE FUNCTION xemChiTieu (ma in varchar)
   maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
-  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  select MANV into maNV from KHOA_NHANVIEN;   --Chi tra ve ma cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
   maNV_raw := dbms_crypto.hash(maNV, hash_type); 
   k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select soTien into sotien_raw from CHITIEU where machitieu = ma;
