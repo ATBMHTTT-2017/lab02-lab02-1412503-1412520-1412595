@@ -1,3 +1,12 @@
+--tạo người dùng
+--tài khoản quản trị viên
+--dùng tài khoản QTV để tạo các bảng
+CREATE USER QTV IDENTIFIED BY quantrivien;
+GRANT DBA TO QTV;
+GRANT CREATE SESSION TO QTV;
+GRANT CREATE ANY CONTEXT, CREATE PROCEDURE TO QTV;
+GRANT EXECUTE ON DBMS_SESSION TO QTV;
+
 --tạo cấu trúc dữ liệu
 --ma nhan vien co dang NV0000
 CREATE TABLE NHANVIEN(
@@ -61,6 +70,12 @@ CREATE TABLE DUAN(
   CONSTRAINT check_kinhPhi
   CHECK (kinhPhi > 0),
   PRIMARY KEY(maDA)
+);
+
+CREATE TABLE KHOA_NHANVIEN(
+  maNV char(6),
+  khoa raw(2000),
+  PRIMARY KEY(maNV, khoa)
 );
 
 ALTER TABLE NHANVIEN
@@ -143,82 +158,114 @@ INSERT INTO PHONGBAN VALUES('PB013', 'Nhân sự', null, TO_DATE( '2007-04-11', 
 INSERT INTO PHONGBAN VALUES('PB014', 'Kế toán', null, TO_DATE( '2008-05-29', 'yyyy-mm-dd'), '3', 'CN005');
 INSERT INTO PHONGBAN VALUES('PB015', 'Kế hoạch', null, TO_DATE( '2008-04-21', 'yyyy-mm-dd'), '4',  'CN005');
 
+--ham them nhan vien va ma hoa
+CREATE OR REPLACE PROCEDURE INS_EMPLOYEE(empID char, empName nchar, empAdd nchar, empTell char, empMail varchar, empRoom char, branch char, empSal int)
+AS
+    keyRaw raw(32);
+    encryptedSal raw(2000);
+BEGIN
+    keyRaw := DBMS_CRYPTO.RANDOMBYTES (32);
+    encryptedSal := ENCRYPT(TO_CHAR(empSal), keyRaw);
+    INSERT INTO KHOA_NHANVIEN VALUES(empID, UTL_RAW.BIT_XOR(keyRaw, UTL_I18N.STRING_TO_RAW(empID)));
+    INSERT INTO NHANVIEN VALUES(empID, empName, empAdd, empTell, empMail, empRoom, branch, encryptedSal);
+END  INS_EMPLOYEE;
 
+CREATE OR REPLACE FUNCTION ENCRYPT(plainText in varchar2, keyRaw in raw )
+RETURN raw
+IS
+     encryption_type    PLS_INTEGER :=  DBMS_CRYPTO.ENCRYPT_AES256 + DBMS_CRYPTO.CHAIN_CBC + DBMS_CRYPTO.PAD_PKCS5;
+       iv_raw             RAW (16);
+     cipherText raw(2000);
+BEGIN
+   iv_raw        := DBMS_CRYPTO.RANDOMBYTES (16);
+   cipherText := DBMS_CRYPTO.ENCRYPT
+      (
+         src => UTL_I18N.STRING_TO_RAW (plainText,  'AL32UTF8'),
+         typ => encryption_type,
+         key => keyRaw,
+         iv  => iv_raw
+      );
+    cipherText := UTL_RAW.CONCAT(iv_raw, cipherText);
+    RETURN cipherText;
+END ENCRYPT;
+/
+show errors
 
 --trưởng chi nhánh
-insert into NHANVIEN values ('NV0011', 'Ngô Hồng Bảo Ngọc', '115, Nguyễn Huệ, phường Bến Nghé, Quận 1, TP.HCM', '01671671677', 'nhbngoc@gmail.com', 'PB001', 'CN001',8000000);
-insert into NHANVIEN values ('NV0012', 'Ngô Huỳnh Phúc Nguyên', '364 Cộng Hòa, phường 13, Quận Tân Bình, TPHCM', '0911119111', 'nhpnguyen@gmail.com', 'PB006', 'CN002',800000);
-insert into NHANVIEN values ('NV0013', 'Huỳnh Thị Tuyết Hạnh', '71 Hai Bà Trưng, phường Tân Định, Quận 1, TPHCM', '0989898098', 'htthanh@gmail.com', 'PB008', 'CN003',8500000);
-insert into NHANVIEN values ('NV0014', 'Lê Thị Mai', '14 Đinh Tiên Hoàng, phường Bến Nghé, Quận 1, TPHCM', '0912346565', 'ltmai@gmail.com', 'PB010', 'CN004',8000000);
-insert into NHANVIEN values ('NV0015', 'Võ Thanh Tùng', '202 Pasteur, phường 6, Quận 3, TPHCM', '0977865123', 'vttung@gmail.com', 'PB015', 'CN005',9000000);
+exec INS_EMPLOYEE ('NV0011', 'Ngô Hồng Bảo Ngọc', '115, Nguyễn Huệ, phường Bến Nghé, Quận 1, TP.HCM', '01671671677', 'nhbngoc@gmail.com', 'PB001', 'CN001',8000000);
+exec INS_EMPLOYEE ('NV0012', 'Ngô Huỳnh Phúc Nguyên', '364 Cộng Hòa, phường 13, Quận Tân Bình, TPHCM', '0911119111', 'nhpnguyen@gmail.com', 'PB006', 'CN002',800000);
+exec INS_EMPLOYEE ('NV0013', 'Huỳnh Thị Tuyết Hạnh', '71 Hai Bà Trưng, phường Tân Định, Quận 1, TPHCM', '0989898098', 'htthanh@gmail.com', 'PB008', 'CN003',8500000);
+exec INS_EMPLOYEE ('NV0014', 'Lê Thị Mai', '14 Đinh Tiên Hoàng, phường Bến Nghé, Quận 1, TPHCM', '0912346565', 'ltmai@gmail.com', 'PB010', 'CN004',8000000);
+exec INS_EMPLOYEE ('NV0015', 'Võ Thanh Tùng', '202 Pasteur, phường 6, Quận 3, TPHCM', '0977865123', 'vttung@gmail.com', 'PB015', 'CN005',9000000);
 
 --truong phong
-INSERT INTO NHANVIEN VALUES('NV0006', 'Trần Ngọc Thùy Tiên', '242 Trần Hưng Đạo quận 5', '0284731461', 'tnttien@gmail.com', 'PB004', 'CN002', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0007', 'Nguyễn Thị Khánh Ngân', '124 Nguyễn Trãi phường 7 quận 5', '091387241', 'ntkngan@gmail.com', 'PB015', 'CN005', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0008', 'Hoàng Thị Chọc Sào', '136 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'htcsao@yahoo.com', 'PB001', 'CN001', '8000000');
-INSERT INTO NHANVIEN VALUES('NV0009', 'Nguyễn Ngọc Phân Thơm', '956 Lò Gốm phường 8 quận 6', '098247264', 'nnpthom@gmail.com', 'PB002', 'CN001', '8500000');
-INSERT INTO NHANVIEN VALUES('NV0010', 'Thòng Hoàng Yến', '56 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'thyen@yahoo.com', 'PB003', 'CN001', '8000000');
+exec INS_EMPLOYEE('NV0006', 'Trần Ngọc Thùy Tiên', '242 Trần Hưng Đạo quận 5', '0284731461', 'tnttien@gmail.com', 'PB004', 'CN002', '9000000');
+exec INS_EMPLOYEE('NV0007', 'Nguyễn Thị Khánh Ngân', '124 Nguyễn Trãi phường 7 quận 5', '091387241', 'ntkngan@gmail.com', 'PB015', 'CN005', '9000000');
+exec INS_EMPLOYEE('NV0008', 'Hoàng Thị Chọc Sào', '136 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'htcsao@yahoo.com', 'PB001', 'CN001', '8000000');
+exec INS_EMPLOYEE('NV0009', 'Nguyễn Ngọc Phân Thơm', '956 Lò Gốm phường 8 quận 6', '098247264', 'nnpthom@gmail.com', 'PB002', 'CN001', '8500000');
+exec INS_EMPLOYEE('NV0010', 'Thòng Hoàng Yến', '56 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'thyen@yahoo.com', 'PB003', 'CN001', '8000000');
 
-INSERT INTO NHANVIEN VALUES('NV0034', 'Bùi Kim Quyên', '269 Trần Hưng Đạo quận 5', '0284731461', 'bkquyen@gmail.com', 'PB005', 'CN002', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0035', 'Võ An Phước Thiện', '121 Nguyễn Trãi phường 7 quận 5', '091387241', 'vapthien@gmail.com', 'PB007', 'CN003', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0036', 'Phạm Nguyễn Quỳnh Trân', '34 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'pnqtran@yahoo.com', 'PB010', 'CN004', '8000000');
-INSERT INTO NHANVIEN VALUES('NV0037', 'Dương Hoài Phương', '950 Lò Gốm phường 8 quận 6', '098247264', 'dhphuong@gmail.com', 'PB013', 'CN005', '8500000');
-INSERT INTO NHANVIEN VALUES('NV0038', 'Phan Vinh Bính', '18 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'pvbinh@yahoo.com', 'PB006', 'CN002', '8000000');
+exec INS_EMPLOYEE('NV0034', 'Bùi Kim Quyên', '269 Trần Hưng Đạo quận 5', '0284731461', 'bkquyen@gmail.com', 'PB005', 'CN002', '9000000');
+exec INS_EMPLOYEE('NV0035', 'Võ An Phước Thiện', '121 Nguyễn Trãi phường 7 quận 5', '091387241', 'vapthien@gmail.com', 'PB007', 'CN003', '9000000');
+exec INS_EMPLOYEE('NV0036', 'Phạm Nguyễn Quỳnh Trân', '34 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'pnqtran@yahoo.com', 'PB010', 'CN004', '8000000');
+exec INS_EMPLOYEE('NV0037', 'Dương Hoài Phương', '950 Lò Gốm phường 8 quận 6', '098247264', 'dhphuong@gmail.com', 'PB013', 'CN005', '8500000');
+exec INS_EMPLOYEE('NV0038', 'Phan Vinh Bính', '18 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'pvbinh@yahoo.com', 'PB006', 'CN002', '8000000');
 
-INSERT INTO NHANVIEN VALUES('NV0039', 'Võ Minh Thư', '271 Trần Hưng Đạo quận 5', '0284731461', 'vmthu@gmail.com', 'PB008', 'CN003', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0040', 'Phan Huỳnh Ngọc Dung', '42 Nguyễn Trãi phường 7 quận 5', '091387241', 'phndung@gmail.com', 'PB011', 'CN004', '9000000');
-INSERT INTO NHANVIEN VALUES('NV0041', 'Nguyễn Vân Anh', '198 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'nvanh@yahoo.com', 'PB014', 'CN005', '8000000');
-INSERT INTO NHANVIEN VALUES('NV0050', 'Nguyễn Thế Vinh', '768 Lò Gốm phường 8 quận 6', '098247264', 'ntvinh@gmail.com', 'PB009', 'CN003', '8500000');
-INSERT INTO NHANVIEN VALUES('NV0051', 'Nguyễnn Thi Thanh Bích', '19 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'nttbich@yahoo.com', 'PB012', 'CN004', '8000000');
+exec INS_EMPLOYEE('NV0039', 'Võ Minh Thư', '271 Trần Hưng Đạo quận 5', '0284731461', 'vmthu@gmail.com', 'PB008', 'CN003', '9000000');
+exec INS_EMPLOYEE('NV0040', 'Phan Huỳnh Ngọc Dung', '42 Nguyễn Trãi phường 7 quận 5', '091387241', 'phndung@gmail.com', 'PB011', 'CN004', '9000000');
+exec INS_EMPLOYEE('NV0041', 'Nguyễn Vân Anh', '198 Nguyễn Đình Chiểu phường 13 quận 1', '090237141', 'nvanh@yahoo.com', 'PB014', 'CN005', '8000000');
+exec INS_EMPLOYEE('NV0050', 'Nguyễn Thế Vinh', '768 Lò Gốm phường 8 quận 6', '098247264', 'ntvinh@gmail.com', 'PB009', 'CN003', '8500000');
+exec INS_EMPLOYEE('NV0051', 'Nguyễnn Thi Thanh Bích', '19 Mạc Đĩnh Chi phường 6 quận 1', '0935732872', 'nttbich@yahoo.com', 'PB012', 'CN004', '8000000');
 
 --Trưởng dự án
-insert into NHANVIEN values ('NV0001', 'Nguyễn Hoàng Anh', '130/25 Trần Hưng Ðạo, phuờng Phạm Ngũ Lão, Quận 1, TPHCM', '0935123456', 'hoanganh589@gmail.com', 'PB001', 'CN001',6000000);
-insert into NHANVIEN values ('NV0002', 'Trần Ngọc Phươnng', '80 Trần Phú, phường 4, Quận 5, TPHCM', '0125896347', 'ngocphuong@gmail.com', 'PB011', 'CN004',6500000);
-insert into NHANVIEN values ('NV0003', 'Võ Thanh Ngọc', '227 Nguyễn Văn Cừ, phường 4, Quận 5, TPHCM', '01666359782', 'thanhngoc@gmail.com', 'PB006', 'CN002',6000000);
-insert into NHANVIEN values ('NV0004', 'Nguyễn Văn Minh', '176 Nguyễn Thị Thập, phường Bình Thuận, Quận 7, TPHCM', '01265897433', 'vanminh@gmail.com', 'PB002', 'CN001',6000000);
-insert into NHANVIEN values ('NV0005', 'Bùi Minh Quang', '938 Lò Gốm, phường 8, Quận 6, TPHCM', '09365874265', 'minhquang@gmail.com', 'PB003', 'CN001',7000000);
+exec INS_EMPLOYEE ('NV0001', 'Nguyễn Hoàng Anh', '130/25 Trần Hưng Ðạo, phuờng Phạm Ngũ Lão, Quận 1, TPHCM', '0935123456', 'hoanganh589@gmail.com', 'PB001', 'CN001',6000000);
+exec INS_EMPLOYEE ('NV0002', 'Trần Ngọc Phươnng', '80 Trần Phú, phường 4, Quận 5, TPHCM', '0125896347', 'ngocphuong@gmail.com', 'PB011', 'CN004',6500000);
+exec INS_EMPLOYEE ('NV0003', 'Võ Thanh Ngọc', '227 Nguyễn Văn Cừ, phường 4, Quận 5, TPHCM', '01666359782', 'thanhngoc@gmail.com', 'PB006', 'CN002',6000000);
+exec INS_EMPLOYEE ('NV0004', 'Nguyễn Văn Minh', '176 Nguyễn Thị Thập, phường Bình Thuận, Quận 7, TPHCM', '01265897433', 'vanminh@gmail.com', 'PB002', 'CN001',6000000);
+exec INS_EMPLOYEE ('NV0005', 'Bùi Minh Quang', '938 Lò Gốm, phường 8, Quận 6, TPHCM', '09365874265', 'minhquang@gmail.com', 'PB003', 'CN001',7000000);
 
-insert into NHANVIEN values ('NV0052', 'Lương Thế Vinh', '12 Cộng Hòa, phuờng 4, Quận Tân Bình, TPHCM', '0935148256', 'thevinh@gmail.com', 'PB007', 'CN003',6000000);
-insert into NHANVIEN values ('NV0053', 'Trần Ngọc Vân', '80 Hồ Thị Kỷ, phường 5, Quận 5, TPHCM', '0125896347', 'ngocvan@gmail.com', 'PB005', 'CN002',6500000);
-insert into NHANVIEN values ('NV0054', 'Võ Vân Ngọc', '22 Trần Đình Xu, phường Cầu Kho, Quận 1, TPHCM', '01666359782', 'vanngoc@gmail.com', 'PB008', 'CN003',6000000);
-insert into NHANVIEN values ('NV0055', 'Nguyễn Văn Hùng', '90 Hồ Hảo Hớn, phường Phạm Ngũ Lão, Quận 1, TPHCM', '01265890143', 'vanhung@gmail.com', 'PB013', 'CN005',6000000);
-insert into NHANVIEN values ('NV0056', 'Bùi Thu Trang', '30 Nguyễn Khắc Nhu, phường Phạm Ngũ Lão, Quận 1, TPHCM', '09365874265', 'thutrang@gmail.com', 'PB004', 'CN002',7000000);
-insert into NHANVIEN values ('NV0057', 'Nguyễn Hoài Tú', '30 Lê Văn Sỹ, phuờng 5, Quận Phú Nhuận, TPHCM', '0901223456', 'hoaitu@gmail.com', 'PB009', 'CN003',6000000);
-insert into NHANVIEN values ('NV0058', 'Trần Thảo Nguyên', '124 Trường Sa, phường 4, Quận Phú Nhuận, TPHCM', '0168996347', 'thaonguyen@gmail.com', 'PB014', 'CN005',6500000);
-insert into NHANVIEN values ('NV0059', 'Võ Thảo Vy', '250 Cao Đạt, phường 4, Quận 5, TPHCM', '03657359782', 'thaovy@gmail.com', 'PB010', 'CN004',6000000);
-insert into NHANVIEN values ('NV0060', 'Nguyễn Minh Thành', '52 Phạm Viết Chánh, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '01210257433', 'minhthanh@gmail.com', 'PB012', 'CN004',6000000);
-insert into NHANVIEN values ('NV0061', 'Bùi Ngọc Hân', '32 Nguyễn Biểu, phường 8, Quận 5, TPHCM', '09369870265', 'ngochan@gmail.com', 'PB015', 'CN005',7000000);
+exec INS_EMPLOYEE ('NV0052', 'Lương Thế Vinh', '12 Cộng Hòa, phuờng 4, Quận Tân Bình, TPHCM', '0935148256', 'thevinh@gmail.com', 'PB007', 'CN003',6000000);
+exec INS_EMPLOYEE ('NV0053', 'Trần Ngọc Vân', '80 Hồ Thị Kỷ, phường 5, Quận 5, TPHCM', '0125896347', 'ngocvan@gmail.com', 'PB005', 'CN002',6500000);
+exec INS_EMPLOYEE ('NV0054', 'Võ Vân Ngọc', '22 Trần Đình Xu, phường Cầu Kho, Quận 1, TPHCM', '01666359782', 'vanngoc@gmail.com', 'PB008', 'CN003',6000000);
+exec INS_EMPLOYEE ('NV0055', 'Nguyễn Văn Hùng', '90 Hồ Hảo Hớn, phường Phạm Ngũ Lão, Quận 1, TPHCM', '01265890143', 'vanhung@gmail.com', 'PB013', 'CN005',6000000);
+exec INS_EMPLOYEE ('NV0056', 'Bùi Thu Trang', '30 Nguyễn Khắc Nhu, phường Phạm Ngũ Lão, Quận 1, TPHCM', '09365874265', 'thutrang@gmail.com', 'PB004', 'CN002',7000000);
+exec INS_EMPLOYEE ('NV0057', 'Nguyễn Hoài Tú', '30 Lê Văn Sỹ, phuờng 5, Quận Phú Nhuận, TPHCM', '0901223456', 'hoaitu@gmail.com', 'PB009', 'CN003',6000000);
+exec INS_EMPLOYEE ('NV0058', 'Trần Thảo Nguyên', '124 Trường Sa, phường 4, Quận Phú Nhuận, TPHCM', '0168996347', 'thaonguyen@gmail.com', 'PB014', 'CN005',6500000);
+exec INS_EMPLOYEE ('NV0059', 'Võ Thảo Vy', '250 Cao Đạt, phường 4, Quận 5, TPHCM', '03657359782', 'thaovy@gmail.com', 'PB010', 'CN004',6000000);
+exec INS_EMPLOYEE ('NV0060', 'Nguyễn Minh Thành', '52 Phạm Viết Chánh, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '01210257433', 'minhthanh@gmail.com', 'PB012', 'CN004',6000000);
+exec INS_EMPLOYEE ('NV0061', 'Bùi Ngọc Hân', '32 Nguyễn Biểu, phường 8, Quận 5, TPHCM', '09369870265', 'ngochan@gmail.com', 'PB015', 'CN005',7000000);
 
 --giams doc
-INSERT INTO NHANVIEN VALUES('NV0016', 'Nguyễn Hoàng Bành Trướng', '98 Hoàng Trân Công Chúa phường 12 quận 3', '0124824217', 'nhbtruong@gmail.com', 'PB001', 'CN001', '40000000');
-INSERT INTO NHANVIEN VALUES('NV0017', 'Nguyễn Phạm Đăng Khoa', '156 Nguyễn Văn Luông phường 9 quận 6', '0127146178', 'npdkhoa@yahoo.com', 'PB002', 'CN001', '42000000');
-INSERT INTO NHANVIEN VALUES('NV0018', 'Phạm Kiều Bình Nguyên', '45 Bãi Sậy phường 8 quận 6', '0123846371', 'pkbnguyen@gmail.com', 'PB001', 'CN001', '40000000');
-INSERT INTO NHANVIEN VALUES('NV0019', 'Ngọc Hoàng Thiên Lôi', '123 Nguyễn Tri Phương quận 5', '0284727847', 'nhtloi@yahoo.com', 'PB002', 'CN001', '35000000');
-INSERT INTO NHANVIEN VALUES('NV0020', 'Nguyễn Huỳnh Mỹ Ái', '23 Bùi Viện quận 3', '092848642', 'nhmai@gmail.com', 'PB003', 'CN001', '45000000');
+exec INS_EMPLOYEE('NV0016', 'Nguyễn Hoàng Bành Trướng', '98 Hoàng Trân Công Chúa phường 12 quận 3', '0124824217', 'nhbtruong@gmail.com', 'PB001', 'CN001', '40000000');
+exec INS_EMPLOYEE('NV0017', 'Nguyễn Phạm Đăng Khoa', '156 Nguyễn Văn Luông phường 9 quận 6', '0127146178', 'npdkhoa@yahoo.com', 'PB002', 'CN001', '42000000');
+exec INS_EMPLOYEE('NV0018', 'Phạm Kiều Bình Nguyên', '45 Bãi Sậy phường 8 quận 6', '0123846371', 'pkbnguyen@gmail.com', 'PB001', 'CN001', '40000000');
+exec INS_EMPLOYEE('NV0019', 'Ngọc Hoàng Thiên Lôi', '123 Nguyễn Tri Phương quận 5', '0284727847', 'nhtloi@yahoo.com', 'PB002', 'CN001', '35000000');
+exec INS_EMPLOYEE('NV0020', 'Nguyễn Huỳnh Mỹ Ái', '23 Bùi Viện quận 3', '092848642', 'nhmai@gmail.com', 'PB003', 'CN001', '45000000');
 
 --Nhân viên quèn
-insert into NHANVIEN values ('NV0021', 'Nguyễn Phượng Hoàng', '676 Võ Văn Kiệt, phường 2, Quận 5, TPHCM', '01247563209', 'phuonghoang@gmail.com', 'PB001', 'CN001',3000000);
-insert into NHANVIEN values ('NV0022', 'Trần Sơn Lâm', '200 Bạch Đằng, phường 9, Quận Tân Bình, TPHCM', '0996874265', 'sonlam@gmail.com', 'PB006', 'CN002',3500000);
-insert into NHANVIEN values ('NV0023', 'Tạ Văn Tấn', '30 Nguyễn Minh Hoàng, phường 12, Quận Tân Bình, TPHCM', '0902596321', 'vantan@gmail.com', 'PB011', 'CN004',4000000);
-insert into NHANVIEN values ('NV0024', 'Lý Thị Bông', '2/14 Trần Quốc Tuấn, phường 1, Quận Gò Vấp, TPHCM', '0901254265', 'thibong@gmail.com', 'PB002', 'CN001',3700000);
-insert into NHANVIEN values ('NV0025', 'Đỗ Minh Khánh', '126/8 Dương Bá Trạc, phường 2, Quận 8, TPHCM', '01225874265', 'minhkhanh@gmail.com', 'PB007', 'CN003',5000000);
-insert into NHANVIEN values ('NV0026', 'Nguyễn Thanh Phong', '676 Võ Văn Ngân, phường 2, Quận Thủ Đức, TPHCM', '01247563252', 'thanhphong@gmail.com', 'PB005', 'CN002',3600000);
-insert into NHANVIEN values ('NV0027', 'Trần Ngọc Vũ', '226 Cống Quỳnh, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '0996874265', 'ngocvu@gmail.com', 'PB003', 'CN001',4500000);
-insert into NHANVIEN values ('NV0028', 'Đỗ Triều', '241 Nguyễn Trãi, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '0925696321', 'dotrieu@gmail.com', 'PB008', 'CN003', 4000000);
-insert into NHANVIEN values ('NV0029', 'Hoàng Kim Lan', '245 Đề Thám, phường Phạm Ngũ Lão, Quận 1, TPHCM', '0632254265', 'kimlan@gmail.com', 'PB013', 'CN005',3900000);
-insert into NHANVIEN values ('NV0030', 'Đỗ Tuyết Nhung', '63 Lý Thái Tổ, phường 2, Quận 10, TPHCM', '01298474265', 'tuyetnhung@gmail.com', 'PB004', 'CN002',5000000);
-insert into NHANVIEN values ('NV0031', 'Trần Phát Tài', '30 Nguyễn Thị Minh Khai, phường 12, Quận Bình Thạnh, TPHCM', '0902502121', 'phattai@gmail.com', 'PB009', 'CN003',4000000);
-insert into NHANVIEN values ('NV0032', 'Lý Kiều Oanh', '2/14 Nguyễn Tri Phương, phường 10, Quận 5, TPHCM', '0901012265', 'kieuoanh@gmail.com', 'PB014', 'CN005',4700000);
-insert into NHANVIEN values ('NV0033', 'Đỗ Phan Anh', '126 Nguyễn Biểu, phường 2, Quận 5, TPHCM', '01365874265', 'phananh@gmail.com', 'PB010', 'CN004',3000000);
-insert into NHANVIEN values ('NV0042', 'Nguyễn Thành Lợi', '101, Nguyễn Huệ, phường Bến Nghé, Quận 1, TP.HCM', '01663428865', 'ntloi@gmail.com', 'PB012', 'CN004', 6000000);
-insert into NHANVIEN values ('NV0043', 'Võ Quốc Duy', '338 Cộng Hòa, phường 13, Quận Tân Bình, TPHCM', '0953774400', 'vqduy@gmail.com', 'PB015', 'CN005',600000);
+exec INS_EMPLOYEE ('NV0021', 'Nguyễn Phượng Hoàng', '676 Võ Văn Kiệt, phường 2, Quận 5, TPHCM', '01247563209', 'phuonghoang@gmail.com', 'PB001', 'CN001',3000000);
+exec INS_EMPLOYEE ('NV0022', 'Trần Sơn Lâm', '200 Bạch Đằng, phường 9, Quận Tân Bình, TPHCM', '0996874265', 'sonlam@gmail.com', 'PB006', 'CN002',3500000);
+exec INS_EMPLOYEE ('NV0023', 'Tạ Văn Tấn', '30 Nguyễn Minh Hoàng, phường 12, Quận Tân Bình, TPHCM', '0902596321', 'vantan@gmail.com', 'PB011', 'CN004',4000000);
+exec INS_EMPLOYEE ('NV0024', 'Lý Thị Bông', '2/14 Trần Quốc Tuấn, phường 1, Quận Gò Vấp, TPHCM', '0901254265', 'thibong@gmail.com', 'PB002', 'CN001',3700000);
+exec INS_EMPLOYEE ('NV0025', 'Đỗ Minh Khánh', '126/8 Dương Bá Trạc, phường 2, Quận 8, TPHCM', '01225874265', 'minhkhanh@gmail.com', 'PB007', 'CN003',5000000);
+exec INS_EMPLOYEE ('NV0026', 'Nguyễn Thanh Phong', '676 Võ Văn Ngân, phường 2, Quận Thủ Đức, TPHCM', '01247563252', 'thanhphong@gmail.com', 'PB005', 'CN002',3600000);
+exec INS_EMPLOYEE ('NV0027', 'Trần Ngọc Vũ', '226 Cống Quỳnh, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '0996874265', 'ngocvu@gmail.com', 'PB003', 'CN001',4500000);
+exec INS_EMPLOYEE ('NV0028', 'Đỗ Triều', '241 Nguyễn Trãi, phường Nguyễn Cư Trinh, Quận 1, TPHCM', '0925696321', 'dotrieu@gmail.com', 'PB008', 'CN003', 4000000);
+exec INS_EMPLOYEE ('NV0029', 'Hoàng Kim Lan', '245 Đề Thám, phường Phạm Ngũ Lão, Quận 1, TPHCM', '0632254265', 'kimlan@gmail.com', 'PB013', 'CN005',3900000);
+exec INS_EMPLOYEE ('NV0030', 'Đỗ Tuyết Nhung', '63 Lý Thái Tổ, phường 2, Quận 10, TPHCM', '01298474265', 'tuyetnhung@gmail.com', 'PB004', 'CN002',5000000);
+exec INS_EMPLOYEE ('NV0031', 'Trần Phát Tài', '30 Nguyễn Thị Minh Khai, phường 12, Quận Bình Thạnh, TPHCM', '0902502121', 'phattai@gmail.com', 'PB009', 'CN003',4000000);
+exec INS_EMPLOYEE ('NV0032', 'Lý Kiều Oanh', '2/14 Nguyễn Tri Phương, phường 10, Quận 5, TPHCM', '0901012265', 'kieuoanh@gmail.com', 'PB014', 'CN005',4700000);
+exec INS_EMPLOYEE ('NV0033', 'Đỗ Phan Anh', '126 Nguyễn Biểu, phường 2, Quận 5, TPHCM', '01365874265', 'phananh@gmail.com', 'PB010', 'CN004',3000000);
+exec INS_EMPLOYEE ('NV0042', 'Nguyễn Thành Lợi', '101, Nguyễn Huệ, phường Bến Nghé, Quận 1, TP.HCM', '01663428865', 'ntloi@gmail.com', 'PB012', 'CN004', 6000000);
+exec INS_EMPLOYEE ('NV0043', 'Võ Quốc Duy', '338 Cộng Hòa, phường 13, Quận Tân Bình, TPHCM', '0953774400', 'vqduy@gmail.com', 'PB015', 'CN005',600000);
 
-insert into NHANVIEN values ('NV0044', 'Lê Mai Phương Uyên', '89 Hai Bà Trưng, phường Tân Định, Quận 1, TPHCM', '0979896012', 'lmpuyen@gmail.com', 'PB001', 'CN001',6500000);
-insert into NHANVIEN values ('NV0045', 'Trương Ngọc Kim Ngân', '20 Đinh Tiên Hoàng, phường Bến Nghé, Quận 1, TPHCM', '01235599324', 'tnkngan@gmail.com', 'PB006', 'CN002',7000000);
-insert into NHANVIEN values ('NV0046', 'Võ Hoàng Phúc', '196 Pasteur, phường 6, Quận 3, TPHCM', '0933654889', 'vhphuc@gmail.com', 'PB011', 'CN004',7000000);
-insert into NHANVIEN values ('NV0047', 'Ngô Hồng Phúc', '32 Nguyễn Du, phường Bến Nghé, Quận 1, TPHCM', '01691154768', 'nhphuc@gmail.com', 'PB002', 'CN001',6000000);
-insert into NHANVIEN values ('NV0048', 'Ngô Huỳnh Phúc Khang', '42 Cộng Hòa, phường 4, Quận Tân Bình, TPHCM', '0948745434', 'nhpkhang@gmail.com', 'PB005', 'CN002',600000);
-insert into NHANVIEN values ('NV0049', 'Nguyễn Hoàng Thành', '95 Võ Thị Sáu, phường Tân Định, Quận 1, TPHCM', '01677234985', 'nhthanh@gmail.com', 'PB003', 'CN001',6500000);
+exec INS_EMPLOYEE ('NV0044', 'Lê Mai Phương Uyên', '89 Hai Bà Trưng, phường Tân Định, Quận 1, TPHCM', '0979896012', 'lmpuyen@gmail.com', 'PB001', 'CN001',6500000);
+exec INS_EMPLOYEE ('NV0045', 'Trương Ngọc Kim Ngân', '20 Đinh Tiên Hoàng, phường Bến Nghé, Quận 1, TPHCM', '01235599324', 'tnkngan@gmail.com', 'PB006', 'CN002',7000000);
+exec INS_EMPLOYEE ('NV0046', 'Võ Hoàng Phúc', '196 Pasteur, phường 6, Quận 3, TPHCM', '0933654889', 'vhphuc@gmail.com', 'PB011', 'CN004',7000000);
+exec INS_EMPLOYEE ('NV0047', 'Ngô Hồng Phúc', '32 Nguyễn Du, phường Bến Nghé, Quận 1, TPHCM', '01691154768', 'nhphuc@gmail.com', 'PB002', 'CN001',6000000);
+exec INS_EMPLOYEE ('NV0048', 'Ngô Huỳnh Phúc Khang', '42 Cộng Hòa, phường 4, Quận Tân Bình, TPHCM', '0948745434', 'nhpkhang@gmail.com', 'PB005', 'CN002',600000);
+exec INS_EMPLOYEE ('NV0049', 'Nguyễn Hoàng Thành', '95 Võ Thị Sáu, phường Tân Định, Quận 1, TPHCM', '01677234985', 'nhthanh@gmail.com', 'PB003', 'CN001',6500000);
+
 
 --Cập nhật trưởng chi nhánh
 update CHINHANH set truongChiNhanh = 'NV0011' where maCN='CN001';
@@ -328,13 +375,7 @@ insert into CHITIEU values ('CT018', 'Nhân công', 40000000000, 'DA014');
 insert into CHITIEU values ('CT019', 'Mặt bằng', 40000000000, 'DA015');
 insert into CHITIEU values ('CT020', 'Nhân công', 35000000000, 'DA015');
 
---tạo người dùng
---tài khoản quản trị viên
-CREATE USER QTV IDENTIFIED BY quantrivien;
-GRANT DBA TO QTV;
-GRANT CREATE SESSION TO QTV;
-GRANT CREATE ANY CONTEXT, CREATE PROCEDURE TO QTV;
-GRANT EXECUTE ON DBMS_SESSION TO QTV;
+
 
 ---tài khoản trưởng phòng
 CREATE USER NV0006 IDENTIFIED BY NV0006;
