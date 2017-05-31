@@ -6,8 +6,8 @@ grant execute on sys.dbms_crypto to TruongDuAn;
 CREATE OR REPLACE
 PACKAGE encrypt_chitieu
 AS
-  FUNCTION maChiTieu( chitieu_int IN int, k varchar2  ) RETURN RAW;
-  FUNCTION giaiMaChiTieu( chitieu_raw IN RAW, k varchar2 ) RETURN int;
+  FUNCTION maChiTieu( chitieu_int IN int, k raw) RETURN RAW;
+  FUNCTION giaiMaChiTieu( chitieu_raw IN RAW, k raw) RETURN int;
 END encrypt_chitieu;
 /
 show errors
@@ -15,39 +15,35 @@ show errors
 CREATE OR REPLACE
 PACKAGE BODY encrypt_chitieu
 AS
-    hash_type PLS_INTEGER := DBMS_CRYPTO.HASH_SH256;
-    key_bytes_raw RAW(32);
     encryption_type    PLS_INTEGER :=         
                             DBMS_CRYPTO.ENCRYPT_AES256
                           + DBMS_CRYPTO.CHAIN_CBC
                           + DBMS_CRYPTO.PAD_PKCS5;
   
-  FUNCTION maChiTieu( chitieu_int IN int, k varchar2) RETURN RAW
+  FUNCTION maChiTieu( chitieu_int IN int, k raw) RETURN RAW
   IS
     chitieu_out raw(2000);
   BEGIN
-    key_bytes_raw := dbms_crypto.hash(k, hash_type); 
     chitieu_out := DBMS_CRYPTO.ENCRYPT
       (
          src => UTL_I18N.STRING_TO_RAW (to_char(chitieu_int), 'AL32UTF8'),
          typ => encryption_type,
-         key => key_bytes_raw
+         key => k
       );                     
     RETURN chitieu_out;
   END maChiTieu;
   
-  FUNCTION giaiMaChiTieu( chitieu_raw IN raw , k varchar2) RETURN int
+  FUNCTION giaiMaChiTieu( chitieu_raw IN raw , k raw) RETURN int
   IS
     chitieu_out int;
   BEGIN
-    key_bytes_raw := dbms_crypto.hash(k, hash_type); 
     chitieu_out := to_number(
     UTL_I18N.RAW_TO_CHAR (
       DBMS_CRYPTO.DECRYPT
       (
          src => chitieu_raw,
          typ => encryption_type,
-         key => key_bytes_raw
+         key => k
       ) 
     , 'AL32UTF8')
     );                    
@@ -64,9 +60,15 @@ grant execute on encrypt_chitieu to TruongDuAn with grant option;
 CREATE OR REPLACE PROCEDURE themChiTieu (maChiTieu in varchar,  tenChiTieu in nvarchar2,  soTien in int,  duAn in char) 
 AS
   tam raw(2000);
-  k varchar2(100);
+  k raw(32);
+  maNV char(6);
+  hash_type PLS_INTEGER := DBMS_CRYPTO.HASH_SH256;
+  maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
+  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  maNV_raw := dbms_crypto.hash(maNV, hash_type); 
+  k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select encrypt_chitieu.maChiTieu(soTien, k) into tam from dual;
   insert into CHITIEU values (maChiTieu, tenChiTieu, tam, duAn);
 END themChiTieu;
@@ -75,9 +77,15 @@ END themChiTieu;
 CREATE OR REPLACE PROCEDURE capNhatSoTienChiTieu (maCT in varchar,  tien in int) 
 AS
   tam raw(2000);
-  k varchar2(100);
+  k raw(32);
+  maNV char(6);
+  hash_type PLS_INTEGER := DBMS_CRYPTO.HASH_SH256;
+  maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
+  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  maNV_raw := dbms_crypto.hash(maNV, hash_type); 
+  k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select encrypt_chitieu.maChiTieu(tien, k) into tam from dual;
   update CHITIEU set soTien = tam where maChiTieu = maCT;
 END capNhatSoTienChiTieu;
@@ -85,10 +93,17 @@ END capNhatSoTienChiTieu;
 --Ham in ra va tra ve gia tri so tien ung voi ma chi tieu ma duoc truyen vao
 CREATE OR REPLACE FUNCTION xemChiTieu (ma in varchar)
  return int AS
-  tam int; sotien_raw raw(2000);
-  k varchar2(100);
+  tam int; 
+  sotien_raw raw(2000);
+  k raw(32);
+  maNV char(6);
+  hash_type PLS_INTEGER := DBMS_CRYPTO.HASH_SH256;
+  maNV_raw RAW(32);
 BEGIN
   select KHOA into k from KHOA_NHANVIEN; --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang KHOA_NHANVIEN
+  select MANV into maNV from NHANVIEN;   --Chi tra ve khoa cua nhan vien dang dang nhap do su dung VPD trong bang NHANVEN
+  maNV_raw := dbms_crypto.hash(maNV, hash_type); 
+  k := UTL_RAW.BIT_XOR(k, maNV_raw);
   select soTien into sotien_raw from CHITIEU where machitieu = ma;
   select encrypt_chitieu.giaiMaChiTieu(sotien_raw, k) into tam from dual;
   dbms_output.put_line(tam);
